@@ -2,21 +2,36 @@
 
 A URL shortening platform built to explore practical backend engineering and system design concepts, including horizontal scaling, caching, rate limiting, background processing, database optimization, and performance monitoring.
 
+## Live Demo
+
+**Try Shortly:** https://shortly-frontend-ten.vercel.app/
+
+| Component | Live URL |
+|---|---|
+| Frontend | https://shortly-frontend-ten.vercel.app/ |
+| Backend API | https://shortly-backend-63j2.onrender.com/ |
+| API Documentation | https://shortly-backend-63j2.onrender.com/docs |
+| API Metrics | https://shortly-backend-63j2.onrender.com/metrics |
+
+**GitHub Repository:** https://github.com/Vedant7077/shortly
+
 ## Overview
 
-Shortly allows users to create short URLs, redirect visitors to original destinations, and monitor link analytics through a real-time dashboard.
+Shortly allows users to create short URLs, redirect visitors to original destinations, and monitor link analytics through a dashboard.
 
 The project focuses on building a backend that can handle concurrent requests efficiently while maintaining data consistency and reliability.
+
+The application is deployed using cloud services, with a React frontend, FastAPI backend, managed PostgreSQL database, and managed Redis instance.
 
 ## Features
 
 - **URL Shortening:** Generate unique short codes for long URLs.
 - **URL Redirection:** Redirect visitors to their original destinations.
 - **Click Analytics:** Track individual link visits and total clicks.
-- **Live Dashboard:** Automatically refresh link statistics.
+- **Live Dashboard:** Display link statistics.
 - **Redis Caching:** Cache URL mappings for faster redirects.
 - **Rate Limiting:** Protect API endpoints using Redis-backed rate limiting.
-- **Horizontal Scaling:** Run multiple FastAPI instances behind Nginx.
+- **Horizontal Scaling:** Run multiple FastAPI instances behind Nginx in the local Docker environment.
 - **Background Processing:** Aggregate click events asynchronously.
 - **Outbox Pattern:** Reliably process URL-update events and invalidate cached mappings.
 - **Database Optimization:** SQLAlchemy connection pooling and application-level read/write routing.
@@ -25,32 +40,66 @@ The project focuses on building a backend that can handle concurrent requests ef
 
 ## System Architecture
 
+### Production Architecture
+
+The production application uses the following architecture:
+
+```text
+                  React + Vite
+                  (Vercel)
+                      |
+                      v
+                FastAPI Backend
+                  (Render)
+                      |
+             +--------+--------+
+             |                 |
+             v                 v
+       Neon PostgreSQL     Upstash Redis
+          Database          Cache and
+                            Rate Limiting
+             ^                 |
+             |                 v
+             +---------- Background
+                         Click Worker
+```
+
+- **Vercel:** Hosts the React frontend.
+- **Render:** Hosts the FastAPI backend and background click worker.
+- **Neon:** Provides managed PostgreSQL storage.
+- **Upstash:** Provides managed Redis for caching, rate limiting, and click counters.
+
+### Local Development Architecture
+
+The local Docker Compose environment provides a more scalable infrastructure setup:
+
 ```text
                     React Frontend
                           |
                           v
-                       Nginx
+                        Nginx
                           |
-                 -----------------
-                 |               |
-                API1             API2
-                 |               |
-                 -------+---------
-                        |
-             -----------------------
-             |                     |
-         PostgreSQL               Redis
-             |                     |
-             |              Click Counters
-             |                     |
-             |                Background
-             |                  Worker
-             |                     |
-             +<--------------------+
-             |
-         Outbox Events
-             |
-       Cache Invalidation
+                 +--------+--------+
+                 |                 |
+                API1              API2
+                 |                 |
+                 +--------+--------+
+                          |
+                +---------+---------+
+                |                   |
+            PostgreSQL            Redis
+                                    |
+                              Click Counters
+                                    |
+                              Background
+                                Worker
+                                    |
+                                    v
+                              PostgreSQL
+                                    |
+                              Outbox Events
+                                    |
+                              Cache Invalidation
 ```
 
 Prometheus collects application metrics from both API instances, while Grafana provides monitoring and visualization.
@@ -61,21 +110,25 @@ Prometheus collects application metrics from both API instances, while Grafana p
 |---|---|
 | Frontend | React, Vite, JavaScript |
 | Backend | Python, FastAPI |
-| Database | PostgreSQL 16 |
+| Database | PostgreSQL |
+| Production Database Hosting | Neon |
 | ORM | SQLAlchemy |
 | Cache and Rate Limiting | Redis |
+| Production Redis Hosting | Upstash |
 | Reverse Proxy | Nginx |
 | Background Processing | Python Workers |
 | Database Migrations | Alembic |
 | Monitoring | Prometheus, Grafana |
 | Load Testing | k6 |
 | Containerization | Docker, Docker Compose |
+| Frontend Deployment | Vercel |
+| Backend Deployment | Render |
 
 ## System Design Concepts Implemented
 
 ### 1. Horizontal Scaling
 
-Two FastAPI instances run independently behind Nginx. Requests are distributed across both instances, and API instance failure was tested locally.
+Two FastAPI instances run independently behind Nginx in the local Docker environment. Requests are distributed across both instances, and API instance failure was tested locally.
 
 ### 2. Redis Caching
 
@@ -99,30 +152,30 @@ URL-update events are stored in PostgreSQL and processed asynchronously. The wor
 
 ### 7. Database Connection Pooling
 
-SQLAlchemy connection pools are configured separately for the two API instances.
+SQLAlchemy connection pools are configured separately for the two local API instances.
 
 Application-level read/write routing is implemented using separate database sessions. Both currently connect to the same PostgreSQL instance; a physical read replica is not configured.
 
 ### 8. Monitoring and Observability
 
-Prometheus scrapes metrics from both API instances, and Grafana is used to visualize application performance.
+Prometheus scrapes metrics from both local API instances, and Grafana is used to visualize application performance.
 
 ## Performance Testing
 
 Load testing was performed locally using k6.
 
-| Metric | Earlier baseline | Two-instance setup |
+| Metric | Earlier Baseline | Two-Instance Setup |
 |---|---:|---:|
-| Virtual users | 10 | 10 |
-| Test duration | 30 seconds | 30 seconds |
-| Requests per second | ~599 | ~1,357 |
-| Average latency | 16.63 ms | 7.33 ms |
-| p95 latency | 26.76 ms | 10.16 ms |
-| HTTP failures | 0% | 0% |
+| Virtual Users | 10 | 10 |
+| Test Duration | 30 seconds | 30 seconds |
+| Requests per Second | ~599 | ~1,357 |
+| Average Latency | 16.63 ms | 7.33 ms |
+| p95 Latency | 26.76 ms | 10.16 ms |
+| HTTP Failures | 0% | 0% |
 
-The two-instance test achieved approximately 2.26× the baseline throughput.
+The two-instance test achieved approximately **2.26× the baseline throughput**.
 
-**Note:** These are local benchmark results from the development machine, not production capacity guarantees. Results depend on the hardware, caching, and test environment.
+**Note:** These are local benchmark results from the development machine, not production capacity guarantees. Results depend on hardware, caching, and the test environment.
 
 ## Project Structure
 
@@ -168,14 +221,14 @@ shortly/
 - Node.js and npm
 - Python 3.13+ (for running Alembic commands locally)
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/Vedant7077/shortly.git
 cd shortly
 ```
 
-### 2. Configure environment variables
+### 2. Configure Environment Variables
 
 ```bash
 cp .env.example .env
@@ -183,7 +236,7 @@ cp .env.example .env
 
 Update `.env` with your local database credentials and configuration.
 
-### 3. Start the backend infrastructure
+### 3. Start the Backend Infrastructure
 
 ```bash
 docker compose up -d --build
@@ -191,7 +244,7 @@ docker compose up -d --build
 
 This starts PostgreSQL, Redis, both API instances, Nginx, the background worker, Prometheus, and Grafana.
 
-### 4. Start the frontend
+### 4. Start the Frontend
 
 ```bash
 cd frontend
@@ -203,7 +256,7 @@ Open:
 
 http://localhost:5173
 
-### 5. Access monitoring
+### 5. Access Monitoring
 
 - Frontend: http://localhost:5173
 - API through Nginx: http://localhost
@@ -221,19 +274,48 @@ http://localhost:5173
 | GET | `/{code}` | Redirect to the original URL |
 | GET | `/metrics` | Prometheus metrics |
 
+## Deployment
+
+Shortly is deployed using the following cloud services:
+
+| Service | Platform |
+|---|---|
+| Frontend | Vercel |
+| Backend API | Render |
+| PostgreSQL Database | Neon |
+| Redis | Upstash |
+
+The backend uses environment variables for production database connections, Redis connectivity, CORS configuration, and public URL configuration.
+
+Database migrations are executed during container startup before the FastAPI application starts.
+
+The background click worker runs alongside the API in the deployed Render container.
+
+**Deployment URLs:**
+
+- Frontend: https://shortly-frontend-ten.vercel.app/
+- Backend: https://shortly-backend-63j2.onrender.com/
+- API Documentation: https://shortly-backend-63j2.onrender.com/docs
+
+**Note:** The free Render instance may spin down after inactivity, resulting in a delay when the application is accessed again.
+
 ## Future Improvements
 
-- Deploy the frontend and backend to cloud hosting.
 - Introduce a managed PostgreSQL read replica.
 - Improve automated integration and end-to-end testing.
 - Add authentication and user-specific link management.
 - Add custom short codes and link expiration.
+- Improve production monitoring and alerting.
+- Implement more robust background worker recovery and reliability.
+- Perform production load testing and capacity analysis.
 
 ## Author
 
 **Vedant Palekar**
 
 Computer Engineering Student | Backend Development | System Design | Cloud & AI
+
+GitHub: https://github.com/Vedant7077
 
 ---
 
