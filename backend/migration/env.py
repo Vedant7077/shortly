@@ -19,10 +19,29 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Use the application's database configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://shortly_user:shortly_dev_password@localhost:5432/shortly"
-)
+# Select database explicitly for migrations.
+# Default: local PostgreSQL.
+# Use -x target=neon to migrate the Neon database.
+migration_target = context.get_x_argument(as_dictionary=True).get("target")
+
+if migration_target == "neon":
+    DATABASE_URL = os.getenv("DATABASE_URL_UNPOOLED")
+
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL_UNPOOLED is not configured.")
+
+    # Use psycopg 3 explicitly with SQLAlchemy.
+    if DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace(
+            "postgresql://",
+            "postgresql+psycopg://",
+            1
+        )
+else:
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql+psycopg://shortly_user:shortly_dev_password@localhost:5432/shortly"
+    )
 
 # Escape percent signs for Alembic's ConfigParser
 config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
